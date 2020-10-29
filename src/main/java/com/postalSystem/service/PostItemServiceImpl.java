@@ -1,14 +1,15 @@
 package com.postalSystem.service;
 
 import com.postalSystem.dto.PostItemDto;
-import com.postalSystem.exception.IncorrectIndexPostOfficeException;
 import com.postalSystem.exception.NoSuchPostItemException;
-import com.postalSystem.exception.NoSuchPostOfficeException;
-import com.postalSystem.exception.UnavailableActionAtCurrentStatusException;
 import com.postalSystem.model.PostItem;
 import com.postalSystem.model.PostOffice;
 import com.postalSystem.model.StatusPostItem;
 import com.postalSystem.repository.PostItemRepo;
+import com.postalSystem.service.postItemHistory.CreatedPostItemHistory;
+import com.postalSystem.service.postItemHistory.DeliveredPostItemHistory;
+import com.postalSystem.service.postItemHistory.SentPostItemHistory;
+import com.postalSystem.service.postItemHistory.WaitingPostItemHistory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -23,11 +24,54 @@ public class PostItemServiceImpl implements PostItemService {
     private PostItemRepo postItemRepo;
 
     @Autowired
-    private PostOfficeService officeService;
+    private PostOfficeService postOfficeService;
 
     @Autowired
     private HistoryService historyService;
 
+
+    @Override
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void create(PostItemDto postItemDto) {
+        PostItem postItem = getPostItemFromDto(postItemDto);
+        postItemRepo.save(postItem);
+        historyService.createHistory(postItem, new CreatedPostItemHistory());
+    }
+
+    @Override
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void sendToPostOffice(PostItem postItem, PostOffice postOffice) {
+        postItem.setNextPostOfficeIndex(postOffice.getIndex());
+        postItem.setStatus(StatusPostItem.delivers);
+        postItemRepo.save(postItem);
+
+        historyService.createHistory(postItem, new SentPostItemHistory());
+    }
+
+    @Override
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void arrivalAtPostOffice(PostItem postItem, PostOffice postOffice) {
+        if (postItem.getTargetPostOffice().getIndex() == postOffice.getIndex()) {
+            postItem.setStatus(StatusPostItem.waitingClient);
+        } else {
+            postItem.setStatus(StatusPostItem.waitingAtIntermediatePostOffice);
+        }
+        postItem.setCurPostOfficeIndex(postOffice.getIndex());
+        postItemRepo.save(postItem);
+
+        historyService.createHistory(postItem, new WaitingPostItemHistory());
+    }
+
+    @Override
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void deliveryToClient(PostItem postItem) {
+        postItem.setStatus(StatusPostItem.isDelivered);
+        postItem.setNextPostOfficeIndex(0);
+        postItem.setCurPostOfficeIndex(0);
+        postItemRepo.save(postItem);
+
+        historyService.createHistory(postItem, new DeliveredPostItemHistory());
+    }
 
     @Override
     public PostItem findById(long id) {
@@ -38,94 +82,16 @@ public class PostItemServiceImpl implements PostItemService {
         return postItem.get();
     }
 
-    @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void create(PostItemDto postItemDto) {
-        //Регистрировать посылку для отправки в тот же офис нельзя
-        if(postItemDto.getTargetPostOfficeIndex() == postItemDto.getCurPostOfficeIndex()) {
-            throw new IncorrectIndexPostOfficeException();
-        }
-
-        int startOfficeIndex = postItemDto.getCurPostOfficeIndex();
-
-        if(!officeService.hasPostOffice(startOfficeIndex)) {
-            throw new NoSuchPostOfficeException();
-        }
-
-        PostOffice targetOffice = officeService.findByIndex(postItemDto.getTargetPostOfficeIndex());
-        PostItem postItem = PostItem.builder()
-                .curPostOfficeIndex(startOfficeIndex)
+    private PostItem getPostItemFromDto(PostItemDto postItemDto) {
+        PostOffice targetOffice = postOfficeService.findByIndex(postItemDto.getTargetPostOfficeIndex());
+        return PostItem.builder()
                 .targetPostOffice(targetOffice)
                 .status(StatusPostItem.registering)
+                .curPostOfficeIndex(postItemDto.getCurrentPostOfficeIndex())
                 .nameRecipient(postItemDto.getNameRecipient())
                 .addressRecipient(postItemDto.getAddressRecipient())
                 .type(postItemDto.getType())
                 .build();
-        postItemRepo.save(postItem);
-        String contentHistory = "The post item is registered in the post office with index = " + startOfficeIndex +
-                                " to post with index = " + targetOffice.getIndex();
-        historyService.createHistory(postItem, contentHistory);
     }
 
-    @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void sendToPostOffice(PostItem postItem, PostOffice office) {
-        //Отправлять посылку в тот же офис нельзя
-        if(postItem.getCurPostOfficeIndex() == office.getIndex()) {
-            throw new IncorrectIndexPostOfficeException();
-        }
-
-        StatusPostItem status = postItem.getStatus();
-        if (status == StatusPostItem.registering || status == StatusPostItem.waitingAtIntermediatePostOffice) {
-            postItem.setNextPostOfficeIndex(office.getIndex());
-            postItem.setStatus(StatusPostItem.delivers);
-            String contentHistory = "The post item was sent to the post office with index = " + office.getIndex();
-            historyService.createHistory(postItem, contentHistory);
-            postItemRepo.save(postItem);
-        } else {
-            throw new UnavailableActionAtCurrentStatusException();
-        }
-    }
-
-    @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void arrival(PostItem postItem, PostOffice office) {
-
-        if (postItem.getStatus() != StatusPostItem.delivers) {
-            throw new UnavailableActionAtCurrentStatusException();
-        }
-
-        //Получать посылку не там, куда она была направлена - нельзя
-        if (postItem.getNextPostOfficeIndex() != office.getIndex()) {
-            throw new IncorrectIndexPostOfficeException();
-        }
-
-        if (postItem.getTargetPostOffice().getIndex() == office.getIndex()) {
-            postItem.setStatus(StatusPostItem.waitingClient);
-        } else {
-            postItem.setStatus(StatusPostItem.waitingAtIntermediatePostOffice);
-        }
-
-        postItem.setCurPostOfficeIndex(office.getIndex());
-        postItemRepo.save(postItem);
-
-        String contentHistory = "The post item arrived at the post office with index  = " + office.getIndex();
-        historyService.createHistory(postItem, contentHistory);
-
-    }
-
-    @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
-    public void delivery(PostItem postItem) {
-        if (postItem.getStatus() != StatusPostItem.waitingClient) {
-            throw new UnavailableActionAtCurrentStatusException();
-        }
-        postItem.setStatus(StatusPostItem.isDelivered);
-        postItem.setNextPostOfficeIndex(0);
-        postItem.setCurPostOfficeIndex(0);
-        postItemRepo.save(postItem);
-
-        String contentHistory = "The post item is delivered";
-        historyService.createHistory(postItem, contentHistory);
-    }
 }

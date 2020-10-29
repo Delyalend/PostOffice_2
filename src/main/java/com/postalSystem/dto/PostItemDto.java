@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PostItemDto {
     private long id;
-    private int curPostOfficeIndex;
+    private int currentPostOfficeIndex;
     private int targetPostOfficeIndex;
     private TypePostItem type;
     private String nameRecipient;

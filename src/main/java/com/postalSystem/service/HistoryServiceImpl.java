@@ -5,6 +5,7 @@ import com.postalSystem.model.History;
 import com.postalSystem.model.PostItem;
 import com.postalSystem.repository.HistoryRepo;
 import com.postalSystem.repository.PostItemRepo;
+import com.postalSystem.service.postItemHistory.HistoryAbstract;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -20,11 +21,23 @@ public class HistoryServiceImpl implements HistoryService {
     @Autowired
     private HistoryRepo historyRepo;
 
+//    @Override
+//    public void createHistory(PostItem postItem, String content) {
+//        History history = History.builder()
+//                .postItem(postItem)
+//                .content(content)
+//                .date(new java.sql.Date(new java.util.Date().getTime()))
+//                .build();
+//        historyRepo.save(history);
+//    }
+
     @Override
-    public void createHistory(PostItem postItem, String content) {
+    public void createHistory(PostItem postItem, HistoryAbstract historyAbstract) {
+        historyAbstract.setPostItem(postItem);
+        String contentHistory = historyAbstract.generateContentHistory();
         History history = History.builder()
                 .postItem(postItem)
-                .content(content)
+                .content(contentHistory)
                 .date(new java.sql.Date(new java.util.Date().getTime()))
                 .build();
         historyRepo.save(history);
@@ -39,4 +52,6 @@ public class HistoryServiceImpl implements HistoryService {
         PostItem postItem = postItemOptional.get();
         return postItem.getHistories();
     }
+
+
 }

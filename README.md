@@ -21,8 +21,6 @@
 
 Подготовительные действия:
 
-
-
 Приложение будет размещаться на Tomcat. Подразумевается, что у вас он уже установлен.
 
 Для простого запуска приложения используйте IDE Intellij IDEA. 
@@ -35,10 +33,10 @@
 	File -> Project Structure -> Project -> Project SDK = 1.8, Project language level = 8
 	File -> Project Structure -> Modules -> language level = 8
 
-(Если вам не хочется всё это проделывать - пролистайте вниз, там есть более
-простой вариант запуска приложения)
 
 Сборка проекта:
+(Если вам не хочется всё это проделывать - пролистайте вниз, там есть более
+простой вариант запуска приложения)
 Около кнопки закрытия IDE есть кнопка "Maven". Кликаем по "Maven". 
 Открывается меню. В шапке меню есть значок "m" - execute maven goal. Кликаем.
 В поиске вводим package - дважды кликаем по "package".
@@ -60,16 +58,31 @@
 ПРОСТОЙ ВАРИАНТ ЗАПУСКА:
 В задании указано, что приложение должно размещаться на любом сервере приложений.
 В Intellij IDEA есть встроенный tomcat - если вам не хочется вручную разворачивать
-war-ник на сервере приложений, скачайте проект отсюда - https://github.com/Delyalend/PostalSystem.
+war-ник на сервере приложений, скачайте проект отсюда - https://github.com/Delyalend/PostOffice_2.
 Затем найдите класс Application и запустите его. Всё)
 Запустите мой проект "soap.xml" в SoapUI.
 Для доступа к базе данных: localhost:8080/h2-console/
 
+Тестирование в SoapUI:
+1. Registration post office:
+{"index":1,"address":"address","name":"name"}
+{"index":1,"address":"address","name":"name"}
 
-Очевидные ошибки:
-- Текст для записи перемещений посылки не должен находиться в коде. Его нужно вынести.
-Красивого решения я пока не обнаружил (нужен совет более опытного разработчика), поэтому решил оставить так
-- Условная логика в сервисах может разрастаться - её желательно отделить от сервисов
+2. Registration post item:
+{"currentPostOfficeIndex":1,"targetPostOfficeIndex":2,"type":"box","nameRecipient":"name","addressRecipient":"address"}
+
+3. Send post item to post office
+{"id":1,"targetPostOfficeIndex":2}
+
+4. Arrival post item to post office
+{"id":1,"targetPostOfficeIndex":2}
+
+5. Delivery post item to client
+{"id":1}
+
+6. Get post item histories
+
+7. Get post item status
 
 Что я бы добавил ещё:
 1. Безопасность

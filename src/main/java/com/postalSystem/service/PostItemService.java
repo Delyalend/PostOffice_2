@@ -8,6 +8,6 @@ public interface PostItemService {
     PostItem findById(long id);
     void create(PostItemDto postItemDto);
     void sendToPostOffice(PostItem postItem, PostOffice postOffice);
-    void arrival(PostItem postItem, PostOffice postOffice);
-    void delivery(PostItem postItem);
+    void arrivalAtPostOffice(PostItem postItem, PostOffice postOffice);
+    void deliveryToClient(PostItem postItem);
 }
